@@ -55,17 +55,18 @@ def _text(message: BaseMessage) -> str:
     return content or ""
 
 
-def _with_system(messages: list[BaseMessage], extra: str) -> list[BaseMessage]:
-    if messages and isinstance(messages[0], SystemMessage):
-        return [SystemMessage(f"{_text(messages[0])}\n\n{extra}"), *messages[1:]]
-    return [SystemMessage(extra), *messages]
+def _with_rules(messages: list[BaseMessage], rules: str) -> list[BaseMessage]:
+    """Les règles de format vont en fin de dernier message : c'est la partie la mieux suivie."""
+    if messages and isinstance(messages[-1], HumanMessage):
+        return [*messages[:-1], HumanMessage(f"{_text(messages[-1])}\n\n{rules}")]
+    return [*messages, HumanMessage(rules)]
 
 
 async def structured(llm: ChatOpenAI, model: type[T], messages: list[BaseMessage], config: RunnableConfig) -> T:
     if not prompt_mode():
         return await llm.with_structured_output(model, method="function_calling").ainvoke(messages, config)
 
-    history = _with_system(messages, _format_rules(model))
+    history = _with_rules(messages, _format_rules(model))
     error = None
     for _ in range(MAX_FORMAT_RETRIES + 1):
         reply = await llm.ainvoke(history, config)
@@ -111,7 +112,7 @@ async def run_agent(
         + 'Quand tu as fini, réponds : {"final": {...}} où l\'objet "final" respecte ce schéma JSON :\n'
         f"{_schema(output)}\nÉchappe les retours à la ligne dans les chaînes (\\n)."
     )
-    history: list[BaseMessage] = [SystemMessage(f"{system}\n\n{rules}"), HumanMessage(message)]
+    history: list[BaseMessage] = [SystemMessage(system), HumanMessage(f"{message}\n\n{rules}")]
     failures = 0
     for step in range(max_steps + MAX_FORMAT_RETRIES + 1):
         if step >= max_steps:
@@ -135,5 +136,10 @@ async def run_agent(
             result = await tool.ainvoke(data.get("args") or {}, config)
         except Exception as e:
             result = f"ERREUR de l'outil : {e}"
-        history.append(HumanMessage(f"Résultat de {tool.name} :\n{str(result)[:TOOL_RESULT_CHARS]}"))
+        history.append(
+            HumanMessage(
+                f"Résultat de {tool.name} :\n{str(result)[:TOOL_RESULT_CHARS]}\n\n"
+                'Continue : réponds uniquement en JSON, {"tool": ..., "args": ...} ou {"final": {...}}.'
+            )
+        )
     raise RuntimeError(f"Agent {name} : pas de livrable final")

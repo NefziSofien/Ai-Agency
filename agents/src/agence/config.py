@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     model_tts: str = ""
     max_revisions: int = 1
     tool_mode: Literal["native", "prompt"] = "native"
+    max_user_message_chars: int = 5500
 
     agence_api_key: str = ""
     api_public_url: str = "http://localhost:8000"
