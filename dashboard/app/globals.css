@@ -1,0 +1,288 @@
+:root {
+  --bg: #f6f7fb;
+  --panel: #ffffff;
+  --text: #1c2033;
+  --muted: #6b7290;
+  --border: #e3e6f0;
+  --accent: #5b4bff;
+  --ok: #138a52;
+  --warn: #b26a00;
+  --err: #c0362c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 14px 28px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 20px;
+}
+
+.topbar nav a {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 28px 60px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="url"],
+select,
+textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font: inherit;
+  background: #fff;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+textarea.code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  min-height: 160px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 7px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #fff;
+  color: var(--accent);
+}
+
+button.danger {
+  background: #fff;
+  color: var(--err);
+  border-color: var(--err);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+.checks label,
+.inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 400;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eef0f7;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.badge.running {
+  background: #ebe9ff;
+  color: var(--accent);
+}
+.badge.awaiting_approval {
+  background: #fff3df;
+  color: var(--warn);
+}
+.badge.completed {
+  background: #e3f6ec;
+  color: var(--ok);
+}
+.badge.failed,
+.badge.rejected {
+  background: #fde8e6;
+  color: var(--err);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--err);
+  background: #fde8e6;
+  padding: 10px 12px;
+  border-radius: 7px;
+  margin: 10px 0;
+  white-space: pre-wrap;
+}
+
+.markdown {
+  line-height: 1.55;
+}
+
+.markdown table {
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.markdown pre {
+  background: #f1f2f7;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.assets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.assets img {
+  width: 180px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.action {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.action pre {
+  margin: 6px 0 0;
+  font-size: 12px;
+  background: #f6f7fb;
+  padding: 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.bar {
+  height: 10px;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.stat strong {
+  display: block;
+  font-size: 22px;
+}

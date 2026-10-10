@@ -15,6 +15,7 @@ from agence.state import DEPARTMENT_LABELS, DEPARTMENTS
 from agence.storage import presigned_url
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("fontTools").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
