@@ -49,7 +49,7 @@ Les agents utilisent trois rôles, configurés dans `.env` :
 | `MODEL_EMBEDDING` | Mémoire de marque (pgvector), optionnel | vide |
 | `MODEL_IMAGE` / `MODEL_TTS` | Agent Visuels | vide |
 
-`auto` fonctionne dès qu'un fournisseur est connecté. Pour fixer des modèles précis avec bascule automatique, crée des combos :
+`auto` fonctionne dès qu'un fournisseur est connecté. Chaque variable accepte aussi une liste séparée par des virgules : les modèles sont alors utilisés à tour de rôle. Pour fixer des modèles précis avec bascule automatique, crée des combos :
 
 ```bash
 export OMNIROUTE_ADMIN_TOKEN=oma_live_...      # OmniRoute -> Settings -> Access Tokens
@@ -70,9 +70,9 @@ Configuration testée sans fournisseur payant :
 
 ```
 TOOL_MODE=prompt
-MODEL_STRATEGIE=cfp/zai-org/glm-5.2
-MODEL_REDACTION=cfp/moonshotai/kimi-k2.6
-MODEL_RAPIDE=cfp/deepseek-ai/deepseek-v4-flash-0731
+MODEL_STRATEGIE=cfp/zai-org/glm-5.2,cfp/deepseek-ai/deepseek-v4-pro-0813,cfp/openai/gpt-oss-120b,cfp/nvidia/nemotron-3-120b-a12b,cfp/moonshotai/kimi-k2.7-code
+MODEL_REDACTION=cfp/moonshotai/kimi-k2.6,cfp/meta-llama/llama-3.3-70b-instruct-fp8-fast,cfp/mistralai/mistral-small-3.1-24b-instruct,cfp/google/gemma-4-26b-a4b-it
+MODEL_RAPIDE=cfp/deepseek-ai/deepseek-v4-flash-0731,cfp/zai-org/glm-4.7-flash,cfp/openai/gpt-oss-20b,cfp/qwen/qwen3-30b-a3b-fp8,cfp/meta/llama-4-scout-17b-16e-instruct
 ```
 
 Compte environ une minute par appel de modèle : un run stratégie + contenu prend une dizaine de minutes.

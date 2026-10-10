@@ -1,5 +1,6 @@
 """Toutes les requêtes de modèles passent par OmniRoute (API compatible OpenAI)."""
 
+from collections import Counter
 from typing import Any, Literal
 
 from langchain_core.callbacks import AsyncCallbackHandler
@@ -13,10 +14,16 @@ from agence.config import settings
 
 Role = Literal["strategie", "redaction", "rapide"]
 
+_turns: Counter[str] = Counter()
+
 
 def model_for(role: Role) -> str:
+    """Un rôle peut lister plusieurs modèles séparés par des virgules : ils sont utilisés à tour de rôle."""
     s = settings()
-    return {"strategie": s.model_strategie, "redaction": s.model_redaction, "rapide": s.model_rapide}[role]
+    value = {"strategie": s.model_strategie, "redaction": s.model_redaction, "rapide": s.model_rapide}[role]
+    models = [m.strip() for m in value.split(",") if m.strip()]
+    _turns[role] += 1
+    return models[(_turns[role] - 1) % len(models)]
 
 
 def api_key_for(client: dict | None) -> str:
@@ -61,38 +68,40 @@ class UsageRecorder(AsyncCallbackHandler):
             pass
 
 
-def _split(text: str, limit: int) -> list[str]:
-    parts = []
-    while len(text) > limit:
-        cut = text.rfind("\n", limit // 2, limit)
-        cut = cut if cut > 0 else limit
-        parts.append(text[:cut])
-        text = text[cut:].lstrip("\n")
-    return [*parts, text]
+def _tail(text: str, limit: int) -> tuple[str, str]:
+    """Coupe en (début, fin) avec une fin d'au plus `limit` caractères, sur un saut de ligne si possible."""
+    if len(text) <= limit:
+        return "", text
+    cut = text.find("\n", len(text) - limit)
+    cut = cut + 1 if 0 <= cut < len(text) - limit // 2 else len(text) - limit
+    return text[:cut], text[cut:]
 
 
 def fit_messages(messages: list[BaseMessage], limit: int) -> list[BaseMessage]:
-    """Adapte la conversation aux passerelles web (mode prompt) : elles ignorent les messages système
-    et limitent la taille du dernier message utilisateur. Les consignes système sont fusionnées dans
-    le premier message utilisateur, et un dernier message trop long est découpé en plusieurs tours."""
+    """Adapte la conversation aux passerelles web (mode prompt), qui ignorent les messages système,
+    limitent la taille du dernier message et le nombre de messages par conversation.
+    Tout est ramené à trois messages : contexte (consignes, historique, début de la demande),
+    accusé de réception, puis la fin de la demande (où figurent les règles de format)."""
     system = "\n\n".join(str(m.content) for m in messages if isinstance(m, SystemMessage))
     turns = [m for m in messages if not isinstance(m, SystemMessage)]
-    if system:
-        first = next((i for i, m in enumerate(turns) if isinstance(m, HumanMessage)), None)
-        if first is None:
-            turns = [HumanMessage(system), *turns]
-        else:
-            turns[first] = HumanMessage(f"CONSIGNES :\n{system}\n\n---\n\n{turns[first].content}")
-    last = turns[-1] if turns else None
-    if not limit or not isinstance(last, HumanMessage) or len(str(last.content)) <= limit:
+    last = turns[-1] if turns and isinstance(turns[-1], HumanMessage) else None
+    history = turns[:-1] if last else turns
+    head, tail = _tail(str(last.content), limit) if last else ("", "")
+    if not system and not history and not head:
         return turns
-    parts = _split(str(last.content), limit - 40)
-    out = turns[:-1]
-    for i, part in enumerate(parts, 1):
-        out.append(HumanMessage(f"(partie {i}/{len(parts)})\n{part}"))
-        if i < len(parts):
-            out.append(AIMessage("Reçu, j'attends la suite."))
-    return out
+
+    sections = [f"CONSIGNES :\n{system}"] if system else []
+    if history:
+        sections.append(
+            "HISTORIQUE DE LA CONVERSATION :\n"
+            + "\n\n".join(
+                f"[{'Toi' if isinstance(m, AIMessage) else 'Utilisateur'}]\n{m.content}" for m in history
+            )
+        )
+    if head:
+        sections.append(f"DÉBUT DE LA DEMANDE ACTUELLE (la suite arrive dans le prochain message) :\n{head}")
+    final = tail or "Réponds en respectant les consignes ci-dessus."
+    return [HumanMessage("\n\n---\n\n".join(sections)), AIMessage("Reçu."), HumanMessage(final)]
 
 
 class PromptModeChat(ChatOpenAI):
