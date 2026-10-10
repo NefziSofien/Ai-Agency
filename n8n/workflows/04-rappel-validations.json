@@ -1,0 +1,62 @@
+{
+  "id": "agenceRappels001",
+  "name": "Agence - Rappel des validations en attente",
+  "active": false,
+  "settings": { "executionOrder": "v1", "errorWorkflow": "agenceErreurs001" },
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Jours ouvrés à 10h et 16h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 10,16 * * 1-5" }] } }
+    },
+    {
+      "id": "a2",
+      "name": "Livrables en attente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "parameters": {
+        "url": "={{ $env.AGENCE_API_URL }}/approvals",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "options": { "response": { "response": { "neverError": false } } }
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Résumé",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "parameters": {
+        "jsCode": "const pending = $input.all().map(i => i.json).filter(r => r.id);\nif (!pending.length) return [];\nconst lines = pending.map(r => `- ${r.client_name} : ${r.brief.slice(0, 80)} (http://localhost:3000/runs/${r.id})`);\nreturn [{ json: { count: pending.length, message: `${pending.length} livrable(s) en attente de validation`, text: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Notification dans le dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0],
+      "notes": "Remplace ou complète ce nœud par Email, Slack, Telegram ou WhatsApp selon les outils de l'agence.",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENCE_API_URL }}/alerts",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'n8n', level: 'info', message: $json.message, details: { liste: $json.text } }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Jours ouvrés à 10h et 16h": { "main": [[{ "node": "Livrables en attente", "type": "main", "index": 0 }]] },
+    "Livrables en attente": { "main": [[{ "node": "Résumé", "type": "main", "index": 0 }]] },
+    "Résumé": { "main": [[{ "node": "Notification dans le dashboard", "type": "main", "index": 0 }]] }
+  }
+}

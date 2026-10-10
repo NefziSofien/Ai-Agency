@@ -4,7 +4,7 @@ name: agence-ia
 #   core          Postgres+pgvector, Redis, stockage S3 (RustFS), SearXNG
 #   observability Langfuse (web + worker + ClickHouse)
 #   automation    n8n
-#   social        Postiz
+#   social        Postiz (+ Temporal)
 #   crm           Twenty CRM + Listmonk
 #
 #   docker compose --profile core up -d
@@ -200,6 +200,7 @@ services:
       AGENCE_API_URL: http://host.docker.internal:8000
       AGENCE_API_KEY: ${AGENCE_API_KEY}
       OMNIROUTE_BASE_URL: http://host.docker.internal:20128/v1
+      OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY}
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
@@ -207,6 +208,30 @@ services:
       - ./n8n/workflows:/workflows:ro
 
   # ---------------- Social ----------------
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    profiles: [social]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      TEMPORAL_NAMESPACE: default
+    volumes:
+      - ./infra/temporal:/etc/temporal/config/dynamicconfig:ro
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
   postiz:
     image: ghcr.io/gitroomhq/postiz-app:latest
     profiles: [social]
@@ -217,6 +242,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      temporal:
+        condition: service_healthy
     environment:
       MAIN_URL: http://localhost:4007
       FRONTEND_URL: http://localhost:4007
@@ -225,6 +252,8 @@ services:
       JWT_SECRET: ${POSTIZ_JWT_SECRET}
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postiz
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      TEMPORAL_ADDRESS: temporal:7233
+      RUN_CRON: "true"
       IS_GENERAL: "true"
       DISABLE_REGISTRATION: "false"
       STORAGE_PROVIDER: local

@@ -65,6 +65,12 @@ def _args_for(name: str, messages: list[dict]) -> dict:
             "feedback": "Renforce l'appel à l'action." if first_pass else "OK",
             "departments_to_revise": ["contenu"] if first_pass else [],
         }
+    if name == "Judgement":
+        return {
+            "scores": [{"criterion": "Livrable complet", "score": 8, "comment": "Bon niveau."}],
+            "overall": 8,
+            "summary": "Livrable solide.",
+        }
     if name == "DepartmentOutput":
         if "Social Media Manager" in text:
             return {
@@ -95,9 +101,9 @@ async def chat(request: Request):
 
     if tools:
         already_used_tool = any(m.get("role") == "tool" for m in messages)
-        for candidate in ("web_search", "list_social_channels"):
+        for candidate in ("web_search", "list_social_channels", "generate_image"):
             if candidate in tool_names and not already_used_tool:
-                arg = {"query": "tendances marketing"} if candidate == "web_search" else {}
+                arg = {"web_search": {"query": "tendances marketing"}, "generate_image": {"prompt": "Visuel de lancement"}}.get(candidate, {})
                 return _reply(model, tool_calls=[_tool_call(candidate, arg)])
         structured = next((n for n in tool_names if n in ("DepartmentOutput", "Plan", "Review")), None)
         if structured:

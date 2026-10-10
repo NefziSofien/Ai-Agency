@@ -1,0 +1,33 @@
+{
+  "id": "agenceVeille0001",
+  "name": "Agence - Veille quotidienne",
+  "active": false,
+  "settings": { "executionOrder": "v1", "errorWorkflow": "agenceErreurs001" },
+  "nodes": [
+    {
+      "id": "v1",
+      "name": "Chaque jour à 7h30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "30 7 * * 1-6" }] } }
+    },
+    {
+      "id": "v2",
+      "name": "Lancer la veille des clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENCE_API_URL }}/automations/daily-watch",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Chaque jour à 7h30": { "main": [[{ "node": "Lancer la veille des clients", "type": "main", "index": 0 }]] }
+  }
+}

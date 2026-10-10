@@ -309,4 +309,4 @@ async def list_alerts(limit: int = 50) -> list[dict]:
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("agence.api.main:app", host="127.0.0.1", port=8000)
+    uvicorn.run("agence.api.main:app", host="0.0.0.0", port=8000)

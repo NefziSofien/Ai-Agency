@@ -1,0 +1,33 @@
+{
+  "id": "agenceRelances01",
+  "name": "Agence - Relances CRM",
+  "active": false,
+  "settings": { "executionOrder": "v1", "errorWorkflow": "agenceErreurs001" },
+  "nodes": [
+    {
+      "id": "c1",
+      "name": "Mardi et jeudi à 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9 * * 2,4" }] } }
+    },
+    {
+      "id": "c2",
+      "name": "Lancer les relances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENCE_API_URL }}/automations/crm-followups",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Mardi et jeudi à 9h": { "main": [[{ "node": "Lancer les relances", "type": "main", "index": 0 }]] }
+  }
+}

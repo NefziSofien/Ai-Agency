@@ -1,0 +1,40 @@
+{
+  "id": "agenceBlogSocial",
+  "name": "Agence - Nouvel article de blog vers posts sociaux (Postiz)",
+  "active": false,
+  "settings": { "executionOrder": "v1", "errorWorkflow": "agenceErreurs001" },
+  "nodes": [
+    {
+      "id": "b1",
+      "name": "Nouvel article (RSS)",
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "notes": "Remplace l'URL par le flux RSS du blog du client, et client_id dans le nœud suivant.",
+      "parameters": {
+        "pollTimes": { "item": [{ "mode": "everyHour" }] },
+        "feedUrl": "https://example.com/feed"
+      }
+    },
+    {
+      "id": "b2",
+      "name": "Brief aux agents contenu, visuels et social",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [280, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENCE_API_URL }}/runs",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_id: 'mon-client', source: 'n8n', departments: ['contenu', 'visuels', 'social'], brief: `Un nouvel article vient d'être publié : \"${$json.title}\" (${$json.link}).\\nRésumé : ${($json.contentSnippet || '').slice(0, 1500)}\\n\\nDécline-le en un post LinkedIn, un post Instagram avec visuel et un post X, puis programme-les dans Postiz sur les 3 prochains jours ouvrés.` }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Nouvel article (RSS)": { "main": [[{ "node": "Brief aux agents contenu, visuels et social", "type": "main", "index": 0 }]] }
+  }
+}

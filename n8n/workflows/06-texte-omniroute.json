@@ -1,0 +1,57 @@
+{
+  "id": "agenceTexteOmni1",
+  "name": "Agence - Générateur de texte rapide (OmniRoute)",
+  "active": false,
+  "settings": { "executionOrder": "v1", "errorWorkflow": "agenceErreurs001" },
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "6f1c2a4e-agence-texte-omniroute",
+      "notes": "POST http://localhost:5678/webhook/generer-texte  {\"prompt\": \"...\", \"model\": \"auto\"}",
+      "parameters": { "httpMethod": "POST", "path": "generer-texte", "responseMode": "lastNode", "options": {} }
+    },
+    {
+      "id": "t2",
+      "name": "OmniRoute",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OMNIROUTE_BASE_URL }}/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.OMNIROUTE_API_KEY }}" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.body.model || 'auto', messages: [{ role: 'system', content: 'Tu es copywriter dans une agence de marketing digital. Réponds en français.' }, { role: 'user', content: $json.body.prompt }] }) }}",
+        "options": { "timeout": 120000 }
+      }
+    },
+    {
+      "id": "t3",
+      "name": "Réponse",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [520, 0],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "r1", "name": "texte", "type": "string", "value": "={{ $json.choices[0].message.content }}" },
+            { "id": "r2", "name": "modele", "type": "string", "value": "={{ $json.model }}" }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "OmniRoute", "type": "main", "index": 0 }]] },
+    "OmniRoute": { "main": [[{ "node": "Réponse", "type": "main", "index": 0 }]] }
+  }
+}

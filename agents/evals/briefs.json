@@ -1,0 +1,49 @@
+{
+  "client": {
+    "id": "eval-agence",
+    "name": "Atelier Nova (client d'évaluation)",
+    "website": "https://example.com",
+    "brand_kit": {
+      "positionnement": "Studio de formation à l'IA générative pour les PME francophones, accompagnement concret et sans jargon.",
+      "offres": "Atelier découverte (1 jour, 690 €), programme 6 semaines (2 900 €), audit IA (1 500 €).",
+      "cibles": "Dirigeants et managers de PME de 10 à 200 salariés, en France, Belgique et Tunisie.",
+      "ton": "Chaleureux, pédagogique, concret, tutoiement interdit.",
+      "valeurs": "Transparence, utilité immédiate, éthique de l'IA.",
+      "interdits": "Promesses de gains chiffrés non prouvés, jargon technique, ton alarmiste sur l'emploi.",
+      "charte_graphique": "Bleu nuit #14213D, corail #FF6B5B, blanc ; style illustratif épuré, personnes réelles en situation de travail."
+    },
+    "settings": {}
+  },
+  "cases": [
+    {
+      "name": "lancement-linkedin",
+      "brief": "Lancer le programme 6 semaines auprès des dirigeants de PME : 3 posts LinkedIn sur 2 semaines.",
+      "departments": ["contenu", "social"],
+      "criteria": [
+        "Les 3 posts sont complets, prêts à publier, avec accroche et appel à l'action",
+        "Le ton respecte le brand kit (vouvoiement, sans jargon, sans promesse chiffrée)",
+        "Un calendrier daté est proposé"
+      ]
+    },
+    {
+      "name": "strategie-concurrence",
+      "brief": "Analyse concurrentielle des offres de formation IA pour PME en France et recommandations de positionnement.",
+      "departments": ["strategie"],
+      "criteria": [
+        "Au moins 3 concurrents réels analysés avec sources",
+        "Recommandations de positionnement différenciantes et actionnables",
+        "Aucune donnée inventée sans source"
+      ]
+    },
+    {
+      "name": "sequence-prospection",
+      "brief": "Séquence de 3 emails de prospection pour proposer l'audit IA à des PME industrielles.",
+      "departments": ["crm"],
+      "criteria": [
+        "3 emails avec objet, corps et délai entre chaque",
+        "Personnalisation et bénéfices concrets pour une PME industrielle",
+        "Respect des interdits du brand kit"
+      ]
+    }
+  ]
+}

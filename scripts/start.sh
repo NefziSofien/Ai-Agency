@@ -51,7 +51,7 @@ start_bg() {
 }
 
 (cd agents && uv sync -q)
-start_bg api agents uv run uvicorn agence.api.main:app --host 127.0.0.1 --port 8000
+start_bg api agents uv run uvicorn agence.api.main:app --host 0.0.0.0 --port 8000
 wait_http http://localhost:8000/docs
 
 [[ -d dashboard/node_modules ]] || (cd dashboard && npm install --silent)

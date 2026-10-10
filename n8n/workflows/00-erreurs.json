@@ -1,0 +1,36 @@
+{
+  "id": "agenceErreurs001",
+  "name": "Agence - Erreurs des automatisations",
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "nodes": [
+    {
+      "id": "e1",
+      "name": "Erreur d'un workflow",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "e2",
+      "name": "Alerte dans le dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENCE_API_URL }}/alerts",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-API-Key", "value": "={{ $env.AGENCE_API_KEY }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'n8n', level: 'error', message: `${$json.workflow.name} : ${$json.execution.error?.message ?? 'erreur inconnue'}`, details: { workflow: $json.workflow, execution_id: $json.execution.id, url: $json.execution.url, node: $json.execution.lastNodeExecuted } }) }}",
+        "options": { "retry": { "maxTries": 3 } }
+      }
+    }
+  ],
+  "connections": {
+    "Erreur d'un workflow": { "main": [[{ "node": "Alerte dans le dashboard", "type": "main", "index": 0 }]] }
+  }
+}
