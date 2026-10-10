@@ -41,6 +41,13 @@ SearXNG tourne en local (profil `core`) et suffit. Pour des résultats de meille
 3. Settings -> Public API : copie la clé dans `POSTIZ_API_KEY`.
 4. Récupère les identifiants des canaux du client (outil `list_social_channels`, ou l'API `GET /api/public/v1/integrations`) et renseigne `postiz_integration_ids` dans les paramètres du client. Vide = tous les canaux.
 
+Postiz s'appuie sur Temporal. Temporal (stockage SQL) n'accepte que trois attributs de recherche de type Text : le service est lancé avec `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true` pour les laisser à Postiz. Si le backend Postiz boucle sur « cannot have more than 3 search attribute of type Text », supprime les attributs de démonstration :
+
+```bash
+docker compose --profile core --profile social exec temporal sh -c 'for a in CustomTextField CustomStringField; do echo y | tctl --address temporal:7233 admin cluster remove-search-attributes --name $a; done'
+docker compose --profile core --profile social restart postiz
+```
+
 ## Google (GA4, Search Console, Google Ads)
 
 Les outils utilisent un jeton OAuth 2.0 (`GOOGLE_OAUTH_ACCESS_TOKEN`) avec les scopes `analytics.readonly`, `webmasters.readonly` et `adwords`. Pour un jeton durable, génère un refresh token (OAuth Playground ou `gcloud auth application-default login --scopes=...`) et rafraîchis l'access token via une tâche n8n ou cron.

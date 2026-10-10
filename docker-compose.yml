@@ -221,12 +221,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PWD: ${POSTGRES_PASSWORD}
       POSTGRES_SEEDS: postgres
+      SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES: "true"
       DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
       TEMPORAL_NAMESPACE: default
     volumes:
       - ./infra/temporal:/etc/temporal/config/dynamicconfig:ro
     healthcheck:
-      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
       interval: 10s
       timeout: 5s
       retries: 30
