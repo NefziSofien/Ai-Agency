@@ -1,0 +1,29 @@
+[project]
+name = "agence"
+version = "0.1.0"
+description = "Écosystème multi-agents de l'agence (LangGraph + OmniRoute)"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "boto3>=1.43.111",
+    "fastapi>=0.143.0",
+    "fpdf2>=2.8.9",
+    "httpx>=0.28.1",
+    "langchain>=1.4.4",
+    "langchain-openai>=1.7.0",
+    "langfuse>=4.17.0",
+    "langgraph>=1.2.14",
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "openai>=3.28.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic-settings>=2.15.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+agence-api = "agence.api.main:run"
+agence-eval = "agence.evals:main"
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11.0"]
+build-backend = "uv_build"
