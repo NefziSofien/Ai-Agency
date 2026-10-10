@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     model_image: str = ""
     model_tts: str = ""
     max_revisions: int = 1
+    tool_mode: Literal["native", "prompt"] = "native"
 
     agence_api_key: str = ""
     api_public_url: str = "http://localhost:8000"

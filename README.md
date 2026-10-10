@@ -62,6 +62,21 @@ uv run --project agents python scripts/omniroute_setup.py combos
 
 Puis dans `.env` : `MODEL_STRATEGIE=agence-strategie`, `MODEL_REDACTION=agence-redaction`, `MODEL_RAPIDE=agence-rapide`.
 
+### Fournisseurs sans appels d'outils
+
+Certains fournisseurs OmniRoute (passerelles web gratuites comme `cfp/` ou `ddgw/`) ignorent les paramètres `tools` et `response_format`. Avec `TOOL_MODE=prompt`, les outils et le schéma JSON attendu sont décrits dans le prompt, la réponse est parsée puis validée, avec relance en cas de format invalide. Garde `TOOL_MODE=native` pour les fournisseurs API classiques (OpenAI, Anthropic, Gemini, Groq…), plus rapides et plus fiables.
+
+Configuration testée sans fournisseur payant :
+
+```
+TOOL_MODE=prompt
+MODEL_STRATEGIE=cfp/zai-org/glm-5.2
+MODEL_REDACTION=cfp/moonshotai/kimi-k2.6
+MODEL_RAPIDE=cfp/deepseek-ai/deepseek-v4-flash-0731
+```
+
+Compte environ une minute par appel de modèle : un run stratégie + contenu prend une dizaine de minutes.
+
 ### Clé et quotas par client
 
 ```bash

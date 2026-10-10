@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from agence import db, observability
 from agence.graphs.agency import build_graph
 from agence.llm import chat
+from agence.structured import structured
 
 CASES_FILE = Path(__file__).resolve().parents[2] / "evals" / "briefs.json"
 
@@ -88,8 +89,9 @@ async def evaluate(case: dict, client: dict, graph) -> Judgement:
     deliverable = state.get("deliverable", "")
     actions = [a for acts in (state.get("actions") or {}).values() for a in acts]
 
-    judge = chat("strategie", client, run_id).with_structured_output(Judgement, method="function_calling")
-    judgement: Judgement = await judge.ainvoke(
+    judgement = await structured(
+        chat("strategie", client, run_id),
+        Judgement,
         [
             SystemMessage(
                 "Tu es directeur qualité d'une agence marketing. Évalue le livrable avec exigence, critère par critère, "

@@ -6,8 +6,6 @@ plan -> route -> department (boucle) -> brand_guardian -> (révision | assemble)
 import json
 import uuid
 
-from langchain.agents import create_agent
-from langchain.agents.structured_output import ToolStrategy
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -28,6 +26,7 @@ from agence.state import (
     Task,
 )
 from agence.storage import save_asset
+from agence.structured import run_agent, structured
 
 AUTOMATED_SOURCES = {"n8n", "schedule"}
 MAX_HUMAN_ROUNDS = 3
@@ -61,8 +60,9 @@ async def plan(state: AgencyState, config: RunnableConfig) -> dict:
         if requested
         else "Choisis les départements nécessaires."
     )
-    llm = chat("strategie", client, run_id).with_structured_output(Plan, method="function_calling")
-    result: Plan = await llm.ainvoke(
+    result = await structured(
+        chat("strategie", client, run_id),
+        Plan,
         [
             SystemMessage(prompt("superviseur")),
             HumanMessage(
@@ -111,15 +111,9 @@ async def department(state: AgencyState, config: RunnableConfig) -> dict:
     if (state.get("results") or {}).get(dep):
         message += f"\n\nTa version précédente, à améliorer :\n{state['results'][dep]}"
 
-    agent = create_agent(
-        chat(spec.role, client, run_id),
-        spec.tools,
-        system_prompt=system,
-        response_format=ToolStrategy(DepartmentOutput),
-        name=f"departement_{dep}",
+    response = await run_agent(
+        chat(spec.role, client, run_id), spec.tools, system, message, DepartmentOutput, config, f"departement_{dep}"
     )
-    out = await agent.ainvoke({"messages": [HumanMessage(message)]}, config)
-    response: DepartmentOutput = out["structured_response"]
     actions = [
         {"id": uuid.uuid4().hex[:12], "department": dep, "kind": a.kind, "summary": a.summary, "payload": a.payload}
         for a in response.actions
@@ -145,8 +139,9 @@ async def brand_guardian(state: AgencyState, config: RunnableConfig) -> dict:
         return {"review": {"approved": True, "score": 10, "issues": [], "feedback": "Aucun livrable à contrôler."}}
 
     actions = [a for acts in (state.get("actions") or {}).values() for a in acts]
-    llm = chat("rapide", client, run_id).with_structured_output(Review, method="function_calling")
-    review: Review = await llm.ainvoke(
+    review = await structured(
+        chat("rapide", client, run_id),
+        Review,
         [
             SystemMessage(prompt("brand_guardian")),
             HumanMessage(
