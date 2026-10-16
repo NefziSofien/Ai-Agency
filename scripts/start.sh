@@ -37,10 +37,10 @@ wait_http() {
   echo "  $1 ne répond pas (voir logs/)." >&2
 }
 
-if ! curl -s -o /dev/null http://localhost:20128; then
+if ! curl -s -o /dev/null http://localhost:20129; then
   echo "Démarrage d'OmniRoute…"
-  setsid nohup npx -y omniroute > logs/omniroute.log 2>&1 &
-  wait_http http://localhost:20128
+  setsid nohup npx -y omniroute serve --port 20129 > logs/omniroute.log 2>&1 &
+  wait_http http://localhost:20129
 fi
 
 start_bg() {
@@ -63,7 +63,7 @@ cat <<EOF
 Écosystème démarré :
   Dashboard agence   http://localhost:3000
   API des agents     http://localhost:8000/docs
-  OmniRoute          http://localhost:20128
+  OmniRoute          http://localhost:20129
   Stockage S3        http://localhost:9001
   Langfuse           http://localhost:3001   (profil observability)
   n8n                http://localhost:5678   (profil automation)

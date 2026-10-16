@@ -1,12 +1,13 @@
 """Registre des départements : rôle de modèle OmniRoute, outils et actions externes autorisées."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
 from typing import Awaitable, Callable
 
 from langchain_core.tools import BaseTool
 
+from agence.config import settings
 from agence.llm import Role
 from agence.tools import ads, crm, postiz
 from agence.tools.analytics import ga4_report
@@ -67,8 +68,20 @@ def prompt(name: str) -> str:
     return (PROMPTS / f"{name}.md").read_text(encoding="utf-8")
 
 
+def spec_for(department: str) -> DepartmentSpec:
+    """Sans clé Postiz, pas de lecture des canaux ni de programmation : les publications restent des brouillons."""
+    spec = DEPARTMENT_SPECS[department]
+    if settings().postiz_api_key:
+        return spec
+    return replace(
+        spec,
+        tools=[t for t in spec.tools if t is not list_social_channels],
+        actions={k: v for k, v in spec.actions.items() if k != "postiz_schedule"},
+    )
+
+
 def actions_doc(department: str) -> str:
-    actions = DEPARTMENT_SPECS[department].actions
+    actions = spec_for(department).actions
     if not actions:
         return "Actions externes autorisées : aucune."
     lines = ["Actions externes autorisées (champ `kind`, puis `payload` attendu) :"]

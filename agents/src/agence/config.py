@@ -10,11 +10,12 @@ ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
-    omniroute_base_url: str = "http://localhost:20128/v1"
+    omniroute_base_url: str = "http://localhost:20129/v1"
     omniroute_api_key: str = ""
     model_strategie: str = "auto"
     model_redaction: str = "auto"
     model_rapide: str = "auto/fast"
+    model_fallback: str = ""
     model_embedding: str = ""
     model_image: str = ""
     model_tts: str = ""

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sauvegarde locale : bases Postgres, stockage S3 (assets, Langfuse), base OmniRoute, .env.
 # Conserve les 14 dernières sauvegardes. À planifier avec cron, par exemple :
-#   0 2 * * * /home/sofien/Desktop/Projects/agence-ia/scripts/backup.sh >> /home/sofien/Desktop/Projects/agence-ia/logs/backup.log 2>&1
+#   0 2 * * * /chemin/vers/agence-ia/scripts/backup.sh >> /chemin/vers/agence-ia/logs/backup.log 2>&1
 set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; source .env; set +a

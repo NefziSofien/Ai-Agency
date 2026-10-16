@@ -1,3 +1,7 @@
+import asyncio
+import ipaddress
+import socket
+
 import httpx
 from bs4 import BeautifulSoup
 from langchain_core.tools import tool
@@ -30,8 +34,27 @@ async def web_search(query: str, max_results: int = 8) -> list[dict]:
         ]
 
 
+async def _check_public_url(request: httpx.Request) -> None:
+    """Anti-SSRF : refuse les URL (et redirections) vers le réseau local, les métadonnées cloud ou un schéma non HTTP."""
+    if request.url.scheme not in ("http", "https"):
+        raise httpx.RequestError(f"Schéma refusé : {request.url.scheme}")
+    host = request.url.host
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as e:
+        raise httpx.RequestError(f"Hôte introuvable : {host}") from e
+    for info in infos:
+        if not ipaddress.ip_address(info[4][0]).is_global:
+            raise httpx.RequestError(f"Adresse non publique refusée : {host}")
+
+
 async def fetch_html(url: str) -> str:
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 AgenceIA"}) as http:
+    async with httpx.AsyncClient(
+        timeout=30,
+        follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0 AgenceIA"},
+        event_hooks={"request": [_check_public_url]},
+    ) as http:
         r = await http.get(url)
         r.raise_for_status()
         return r.text

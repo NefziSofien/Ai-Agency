@@ -13,7 +13,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from agence.config import settings
-from agence.graphs.departments import DEPARTMENT_SPECS, EXECUTORS, ORDER, actions_doc, prompt
+from agence.graphs.departments import EXECUTORS, ORDER, actions_doc, prompt, spec_for
 from agence.llm import chat
 from agence.memory import brand_context
 from agence.reports import markdown_to_pdf
@@ -96,7 +96,7 @@ async def department(state: AgencyState, config: RunnableConfig) -> dict:
     client, run_id = _ctx(config)
     task = state["current"]
     dep = task["department"]
-    spec = DEPARTMENT_SPECS[dep]
+    spec = spec_for(dep)
 
     brand = await brand_context(client, f"{state['brief']}\n{task['instruction']}")
     system = "\n\n".join(

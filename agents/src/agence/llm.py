@@ -1,5 +1,7 @@
 """Toutes les requêtes de modèles passent par OmniRoute (API compatible OpenAI)."""
 
+import logging
+import re
 from collections import Counter
 from typing import Any, Literal
 
@@ -7,12 +9,15 @@ from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
+import openai
 from openai import AsyncOpenAI
 
 from agence import db
 from agence.config import settings
 
 Role = Literal["strategie", "redaction", "rapide"]
+
+log = logging.getLogger(__name__)
 
 _turns: Counter[str] = Counter()
 
@@ -104,11 +109,62 @@ def fit_messages(messages: list[BaseMessage], limit: int) -> list[BaseMessage]:
     return [HumanMessage("\n\n---\n\n".join(sections)), AIMessage("Reçu."), HumanMessage(final)]
 
 
-class PromptModeChat(ChatOpenAI):
+_SUMMARY_TAG = re.compile(r"^\s*<summary>.*?</summary>\s*", re.S)
+BRIDGE_RETRIES = 3
+BRIDGE_NUDGE = "\n\nIMPORTANT: do not summarize the conversation or describe the task. Do the task now and reply in the required format."
+
+
+def strip_bridge_summary(text: str) -> str | None:
+    """Le pont Devin (dva/) préfixe parfois la réponse d'un résumé de conversation en anglais, ou ne renvoie
+    que ce résumé. Retire le préfixe ; renvoie None si la réponse n'est qu'un résumé."""
+    text = _SUMMARY_TAG.sub("", text)
+    if text.lstrip().startswith("## Overview") and "{" not in text:
+        return None
+    return text
+
+
+class FallbackChat(ChatOpenAI):
+    """Bascule sur MODEL_FALLBACK quand le modèle échoue (quota Devin épuisé, pont indisponible…).
+    La bascule vaut pour le reste de l'étape : un quota épuisé ne revient pas en cours de run."""
+
+    fallback_models: list[str] = []
+
+    def _next_fallback(self, reason: object) -> bool:
+        if not self.fallback_models:
+            return False
+        previous, self.model_name = self.model_name, self.fallback_models.pop(0)
+        log.warning("Modèle %s indisponible (%s), bascule sur %s", previous, str(reason)[:200], self.model_name)
+        return True
+
+    async def _agenerate(self, messages, *args, **kwargs):
+        while True:
+            try:
+                return await super()._agenerate(messages, *args, **kwargs)
+            except openai.APIError as e:
+                if not self._next_fallback(e):
+                    raise
+
+
+class PromptModeChat(FallbackChat):
     max_user_message_chars: int = 0
 
     async def _agenerate(self, messages, *args, **kwargs):
-        return await super()._agenerate(fit_messages(messages, self.max_user_message_chars), *args, **kwargs)
+        messages = fit_messages(messages, self.max_user_message_chars)
+        while True:
+            sent = messages
+            if self.model_name.startswith("dva/") and isinstance(messages[-1], HumanMessage):
+                sent = [*messages[:-1], HumanMessage(f"{messages[-1].content}{BRIDGE_NUDGE}")]
+            for _ in range(BRIDGE_RETRIES):
+                result = await super()._agenerate(sent, *args, **kwargs)
+                gen = result.generations[0]
+                if not isinstance(gen.message.content, str):
+                    return result
+                text = strip_bridge_summary(gen.message.content)
+                if text is not None:
+                    gen.message.content = gen.text = text
+                    return result
+            if not self._next_fallback("réponses réduites à un résumé"):
+                return result
 
     async def _astream(self, messages, *args, **kwargs):
         async for chunk in super()._astream(fit_messages(messages, self.max_user_message_chars), *args, **kwargs):
@@ -119,8 +175,10 @@ def chat(role: Role, client: dict | None = None, run_id: str | None = None, **kw
     s = settings()
     if s.tool_mode == "prompt":
         kwargs.setdefault("max_user_message_chars", s.max_user_message_chars)
-    return (PromptModeChat if s.tool_mode == "prompt" else ChatOpenAI)(
-        model=model_for(role),
+    model = model_for(role)
+    return (PromptModeChat if s.tool_mode == "prompt" else FallbackChat)(
+        model=model,
+        fallback_models=[m.strip() for m in s.model_fallback.split(",") if m.strip() and m.strip() != model],
         base_url=s.omniroute_base_url,
         api_key=api_key_for(client),
         timeout=300,

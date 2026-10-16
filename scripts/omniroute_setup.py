@@ -20,7 +20,7 @@ import sys
 
 import httpx
 
-BASE = os.environ.get("OMNIROUTE_URL", "http://localhost:20128").rstrip("/")
+BASE = os.environ.get("OMNIROUTE_URL", "http://localhost:20129").rstrip("/")
 ROLES = {
     "agence-strategie": ("COMBO_STRATEGIE_MODELS", "Raisonnement : stratégie, analyse, planification"),
     "agence-redaction": ("COMBO_REDACTION_MODELS", "Rédaction : contenus, copywriting, emails"),

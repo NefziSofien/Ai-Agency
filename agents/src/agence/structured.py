@@ -6,6 +6,7 @@ Mode `prompt` : pour les modèles OmniRoute dont le fournisseur ignore `tools` e
 """
 
 import json
+import re
 from typing import TypeVar
 
 from langchain.agents import create_agent
@@ -41,8 +42,28 @@ def _format_rules(model: type[BaseModel]) -> str:
     )
 
 
+_TAGGED_CALL = re.compile(r"<(\w+)>\s*(\{.*\})\s*</\1>", re.S)
+
+
+def _first_json_object(text: str) -> dict:
+    """Les modèles agentiques (pont Devin) entourent souvent le JSON de texte ou de balises XML."""
+    decoder = json.JSONDecoder()
+    for i, char in enumerate(text):
+        if char == "{":
+            try:
+                data, _ = decoder.raw_decode(text, i)
+            except ValueError:
+                continue
+            if isinstance(data, dict):
+                return data
+    raise ValueError("aucun objet JSON dans la réponse")
+
+
 def _parse(text: str) -> dict:
-    data = parse_json_markdown(text)
+    try:
+        data = parse_json_markdown(text)
+    except ValueError:
+        data = _first_json_object(text)
     if not isinstance(data, dict):
         raise ValueError("la réponse n'est pas un objet JSON")
     return data
@@ -120,7 +141,11 @@ async def run_agent(
         reply = await llm.ainvoke(history, config)
         history.append(reply)
         try:
-            data = _parse(_text(reply))
+            text = _text(reply)
+            call = _TAGGED_CALL.fullmatch(text.strip())
+            if call and call.group(1) in by_name:
+                text = json.dumps({"tool": call.group(1), "args": json.loads(call.group(2))})
+            data = _parse(text)
             if "final" in data or "report" in data:
                 return output.model_validate(data.get("final", data))
             tool = by_name.get(data.get("tool", ""))

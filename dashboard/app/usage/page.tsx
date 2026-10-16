@@ -61,7 +61,7 @@ export default function UsagePage() {
         )}
         {health.data && health.data.omniroute === "ok" && health.data.models === 0 && (
           <p className="error">
-            OmniRoute répond mais aucun modèle n'est disponible : connecte un fournisseur dans http://localhost:20128.
+            OmniRoute répond mais aucun modèle n'est disponible : connecte un fournisseur dans http://localhost:20129.
           </p>
         )}
       </div>

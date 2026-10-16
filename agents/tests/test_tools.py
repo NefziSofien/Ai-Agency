@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from agence.graphs.departments import DEPARTMENT_SPECS, EXECUTORS, actions_doc
+from agence.config import settings
+from agence.graphs.departments import DEPARTMENT_SPECS, EXECUTORS, actions_doc, spec_for
 from agence.tools import ads, crm
 from agence.tools.analytics import ga4_report
 from agence.tools.common import NotConfigured
@@ -54,3 +55,16 @@ def test_unconfigured_executors_raise():
         run(crm.email_campaign(CLIENT, {"subject": "x", "body": "y"}))
     with pytest.raises(NotConfigured):
         run(ads.create_meta_campaign(CLIENT, {"name": "x"}))
+
+
+def test_social_without_postiz_key_only_drafts(monkeypatch):
+    monkeypatch.setattr(settings(), "postiz_api_key", "")
+    spec = spec_for("social")
+    assert "postiz_schedule" not in spec.actions
+    assert "list_social_channels" not in [t.name for t in spec.tools]
+    assert "postiz_schedule" not in actions_doc("social")
+
+
+def test_social_with_postiz_key_can_schedule(monkeypatch):
+    monkeypatch.setattr(settings(), "postiz_api_key", "cle")
+    assert "postiz_schedule" in spec_for("social").actions

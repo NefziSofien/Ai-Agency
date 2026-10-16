@@ -10,7 +10,7 @@ name: agence-ia
 #   docker compose --profile core up -d
 #   docker compose --profile core --profile automation --profile social up -d
 #
-# OmniRoute tourne sur l'hôte (port 20128) : les conteneurs l'atteignent via host.docker.internal.
+# OmniRoute tourne sur l'hôte (port 20129) : les conteneurs l'atteignent via host.docker.internal.
 
 x-host-gateway: &host-gateway
   extra_hosts:
@@ -199,7 +199,7 @@ services:
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       AGENCE_API_URL: http://host.docker.internal:8000
       AGENCE_API_KEY: ${AGENCE_API_KEY}
-      OMNIROUTE_BASE_URL: http://host.docker.internal:20128/v1
+      OMNIROUTE_BASE_URL: http://host.docker.internal:20129/v1
       OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY}
     ports:
       - "127.0.0.1:5678:5678"
@@ -261,7 +261,7 @@ services:
       UPLOAD_DIRECTORY: /uploads
       NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
       OPENAI_API_KEY: ${OMNIROUTE_API_KEY}
-      OPENAI_BASE_URL: http://host.docker.internal:20128/v1
+      OPENAI_BASE_URL: http://host.docker.internal:20129/v1
     ports:
       - "127.0.0.1:4007:5000"
     volumes:

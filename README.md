@@ -2,7 +2,7 @@
 
 Écosystème multi-agents auto-hébergé pour une agence de marketing digital et de promotion IA. Une équipe d'agents spécialisés (stratégie, contenu, visuels, social, SEO/SEA, analytics, CRM) traite les briefs clients, un Brand Guardian contrôle la qualité, et **toute action externe (publication, email, campagne pub) attend une validation humaine** dans le dashboard.
 
-Tous les modèles passent par **OmniRoute**, la passerelle locale sur `http://localhost:20128/v1`. Aucun code n'est lié à un fournisseur : on change de modèle dans OmniRoute, pas dans le code.
+Tous les modèles passent par **OmniRoute**, la passerelle locale sur `http://localhost:20129/v1`. Aucun code n'est lié à un fournisseur : on change de modèle dans OmniRoute, pas dans le code.
 
 ```mermaid
 flowchart TB
@@ -14,7 +14,7 @@ flowchart TB
     Depts --> Guardian[Brand Guardian]
     Guardian --> Approval[Validation humaine]
     Approval --> Exec["Exécution : Postiz, Twenty, Listmonk, Google Ads, Meta"]
-    Graph --> OmniRoute["OmniRoute :20128"]
+    Graph --> OmniRoute["OmniRoute :20129"]
     Graph --> PG[("Postgres + pgvector")]
     Graph --> S3[("Stockage S3 RustFS")]
     Graph --> Langfuse["Langfuse :3001"]
@@ -23,7 +23,7 @@ flowchart TB
 ## Démarrage rapide
 
 ```bash
-cd ~/Desktop/Projects/agence-ia
+git clone <url-du-depot> agence-ia && cd agence-ia
 scripts/init_env.sh          # génère .env avec des secrets aléatoires (une seule fois)
 scripts/start.sh             # Docker (core) + OmniRoute + API + dashboard
 scripts/start.sh observability automation social crm   # avec tous les services
@@ -32,7 +32,7 @@ scripts/start.sh --stop
 
 Puis, une seule fois :
 
-1. **Connecter un fournisseur dans OmniRoute** : ouvre http://localhost:20128, ajoute au moins un fournisseur (clé API ou connexion OAuth). Sans fournisseur, aucun agent ne peut répondre.
+1. **Connecter un fournisseur dans OmniRoute** : ouvre http://localhost:20129, ajoute au moins un fournisseur (clé API ou connexion OAuth). Sans fournisseur, aucun agent ne peut répondre.
 2. **Créer une clé OmniRoute pour l'agence** (dashboard OmniRoute -> API Keys) et la mettre dans `.env` : `OMNIROUTE_API_KEY=sk-...`, puis relancer `scripts/start.sh`.
 3. Ouvrir http://localhost:3000, page **Usage et santé** : OmniRoute doit être « ok » avec au moins un modèle.
 4. Page **Clients** : créer un client avec son brand kit, puis lancer un brief depuis la page **Briefs**.
@@ -46,6 +46,7 @@ Les agents utilisent trois rôles, configurés dans `.env` :
 | `MODEL_STRATEGIE` | Directeur de compte, Stratégie, SEO/SEA, Analytics, juge des évaluations | `auto` |
 | `MODEL_REDACTION` | Contenu, Visuels, Social, CRM | `auto` |
 | `MODEL_RAPIDE` | Brand Guardian, synthèses | `auto/fast` |
+| `MODEL_FALLBACK` | Modèles de secours, essayés dans l'ordre quand un appel échoue (quota épuisé, fournisseur indisponible) | vide |
 | `MODEL_EMBEDDING` | Mémoire de marque (pgvector), optionnel | vide |
 | `MODEL_IMAGE` / `MODEL_TTS` | Agent Visuels | vide |
 
@@ -117,7 +118,7 @@ Un outil non configuré ne bloque pas l'agent : il le signale dans son livrable.
 |---|---|---|
 | Dashboard de l'agence | http://localhost:3000 | (Node, hôte) |
 | API des agents | http://localhost:8000/docs | (Python, hôte) |
-| OmniRoute | http://localhost:20128 | (Node, hôte) |
+| OmniRoute | http://localhost:20129 | (Node, hôte) |
 | Postgres + pgvector | localhost:5433 | core |
 | Redis | localhost:6380 | core |
 | Stockage S3 (RustFS) | http://localhost:9001 (console) | core |
@@ -134,10 +135,10 @@ Tous les ports sont liés à `127.0.0.1`, sauf l'API (`0.0.0.0:8000`, protégée
 
 ### Pare-feu : accès des conteneurs à l'hôte
 
-n8n et Postiz appellent l'API (`:8000`) et OmniRoute (`:20128`) via `host.docker.internal`. Si le pare-feu de l'hôte (ufw) bloque ce trafic, autorise les réseaux Docker :
+n8n et Postiz appellent l'API (`:8000`) et OmniRoute (`:20129`) via `host.docker.internal`. Si le pare-feu de l'hôte (ufw) bloque ce trafic, autorise les réseaux Docker :
 
 ```bash
-sudo ufw allow from 172.16.0.0/12 to any port 8000,20128 proto tcp
+sudo ufw allow from 172.16.0.0/12 to any port 8000,20129 proto tcp
 ```
 
 ## Automatisations n8n
@@ -159,7 +160,7 @@ Les workflows sont importés désactivés ; active-les dans http://localhost:567
 | Article de blog vers social | nouvel article RSS | run contenu + visuels + social, publication Postiz après validation |
 | Générateur de texte rapide | webhook `POST /webhook/generer-texte` | appel direct à OmniRoute |
 
-Pour utiliser les nœuds IA natifs de n8n, crée une credential **OpenAI** avec l'URL de base `http://host.docker.internal:20128/v1` et ta clé OmniRoute.
+Pour utiliser les nœuds IA natifs de n8n, crée une credential **OpenAI** avec l'URL de base `http://host.docker.internal:20129/v1` et ta clé OmniRoute.
 
 ## Qualité, sauvegardes, tests
 
@@ -179,9 +180,25 @@ AGENCE_TEST_URL=http://localhost:8010 uv run python tests/e2e.py
 ```
 
 Sauvegarde automatique chaque nuit : `crontab -e` puis
-`0 2 * * * $HOME/Desktop/Projects/agence-ia/scripts/backup.sh >> $HOME/Desktop/Projects/agence-ia/logs/backup.log 2>&1`
+`0 2 * * * /chemin/vers/agence-ia/scripts/backup.sh >> /chemin/vers/agence-ia/logs/backup.log 2>&1`
+
+Les sauvegardes contiennent une copie de `.env` (secrets) : garde le dossier `backups/` en local ou chiffre-le avant tout transfert.
 
 Langfuse (profil `observability`) est initialisé avec le projet `agence-ia` et les clés de `.env` : les traces apparaissent automatiquement dès qu'il tourne au démarrage de l'API.
+
+## Sécurité
+
+Ce projet est conçu pour un **poste ou serveur de confiance, non exposé à Internet**. Points à connaître avant de le déployer :
+
+- Le dashboard n'a **pas d'authentification** : toute personne qui l'atteint pilote l'API (le proxy `/api` injecte `AGENCE_API_KEY`). Ne l'expose pas ; place-le derrière un reverse proxy avec authentification (VPN, SSO, basic auth).
+- Si `AGENCE_API_KEY` est vide, l'API n'est pas authentifiée. `scripts/init_env.sh` la génère ; l'API écoute sur `0.0.0.0:8000` pour n8n (Docker) : filtre le port au pare-feu ou définis `API_HOST=127.0.0.1` si tu n'utilises pas n8n.
+- Le fichier `.env` contient tous les secrets : il est ignoré par git (`chmod 600`). Ne le committe jamais.
+- L'outil `fetch_page` refuse les adresses non publiques (anti-SSRF) ; les actions externes restent soumises à validation humaine.
+- n8n a accès aux variables d'environnement (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`) : n'importe que des workflows de confiance.
+- Postiz accepte les inscriptions (`DISABLE_REGISTRATION=false`) : passe-le à `true` une fois ton compte créé.
+- Les images Docker utilisent `latest` : fige les versions pour un déploiement durable.
+
+Signalement de vulnérabilités : voir [SECURITY.md](SECURITY.md). Contribuer : [CONTRIBUTING.md](CONTRIBUTING.md). Licence : [MIT](LICENSE).
 
 ## Structure
 

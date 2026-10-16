@@ -1,11 +1,13 @@
+import hmac
 import logging
+import os
 import re
 import unicodedata
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
 
@@ -20,6 +22,8 @@ logging.getLogger("fontTools").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not settings().agence_api_key:
+        logging.warning("AGENCE_API_KEY est vide : l'API n'est PAS authentifiée. Lance scripts/init_env.sh.")
     await db.open_pool()
     await runner.init()
     await runner.recover_interrupted_runs()
@@ -29,7 +33,7 @@ async def lifespan(app: FastAPI):
 
 def require_api_key(x_api_key: str = Header(default="")) -> None:
     expected = settings().agence_api_key
-    if expected and x_api_key != expected:
+    if expected and not hmac.compare_digest(x_api_key.encode(), expected.encode()):
         raise HTTPException(401, "Clé API invalide (en-tête X-API-Key).")
 
 
@@ -162,7 +166,7 @@ async def create_run(body: RunIn) -> dict:
 
 
 @app.get("/runs")
-async def list_runs(client_id: str | None = None, status: str | None = None, limit: int = 50) -> list[dict]:
+async def list_runs(client_id: str | None = None, status: str | None = None, limit: int = Query(50, ge=1, le=200)) -> list[dict]:
     return await db.fetch(
         "SELECT r.*, c.name AS client_name FROM runs r JOIN clients c ON c.id = r.client_id"
         " WHERE (%s::text IS NULL OR r.client_id = %s) AND (%s::text IS NULL OR r.status = %s)"
@@ -210,7 +214,7 @@ async def decide(run_id: str, body: DecisionIn) -> dict:
 
 # ---------------- Usage OmniRoute ----------------
 @app.get("/usage")
-async def usage(days: int = 30) -> dict:
+async def usage(days: int = Query(30, ge=1, le=365)) -> dict:
     by_client = await db.fetch(
         "SELECT u.client_id, c.name AS client_name, COUNT(*) AS calls, SUM(u.input_tokens) AS input_tokens,"
         " SUM(u.output_tokens) AS output_tokens FROM usage u LEFT JOIN clients c ON c.id = u.client_id"
@@ -302,11 +306,11 @@ async def create_alert(body: AlertIn) -> dict:
 
 
 @app.get("/alerts")
-async def list_alerts(limit: int = 50) -> list[dict]:
+async def list_alerts(limit: int = Query(50, ge=1, le=200)) -> list[dict]:
     return await db.fetch("SELECT * FROM alerts ORDER BY created_at DESC LIMIT %s", limit)
 
 
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("agence.api.main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("agence.api.main:app", host=os.getenv("API_HOST", "0.0.0.0"), port=8000)

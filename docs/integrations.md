@@ -24,7 +24,7 @@ Deux niveaux de configuration :
 
 ## OmniRoute (obligatoire)
 
-1. http://localhost:20128 : connecte au moins un fournisseur.
+1. http://localhost:20129 : connecte au moins un fournisseur.
 2. API Keys : crée une clé, mets-la dans `OMNIROUTE_API_KEY`.
 3. Optionnel : combos par rôle et clés par client avec `scripts/omniroute_setup.py` (voir le README).
 4. Pour les visuels : renseigne `MODEL_IMAGE` (et `MODEL_TTS` pour les voix off) avec un modèle exposé par OmniRoute sur `/v1/images` et `/v1/audio`.
