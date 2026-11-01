@@ -12,9 +12,11 @@ cd dashboard && npm install     # Node 20+
 ## Avant une pull request
 
 ```bash
-cd agents && uv run pytest -q tests/test_tools.py tests/test_llm.py
+cd agents && uv run pytest -q tests/test_tools.py tests/test_llm.py tests/test_security.py
 cd dashboard && npm run typecheck
 ```
+
+La CI (`.github/workflows/ci.yml`) exécute ces mêmes vérifications sur chaque push et chaque pull request.
 
 - N'ajoute jamais de secret, de jeton ou de chemin personnel dans le code, les workflows n8n ou la documentation : utilise `.env.example` avec des valeurs vides.
 - Les prompts des agents (`agents/src/agence/prompts/`) et la documentation sont en français ; le code reste en anglais/français comme dans les fichiers existants.

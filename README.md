@@ -1,223 +1,114 @@
-# Agence IA : écosystème multi-agents local
+**English** | [Français](README.fr.md)
 
-Écosystème multi-agents auto-hébergé pour une agence de marketing digital et de promotion IA. Une équipe d'agents spécialisés (stratégie, contenu, visuels, social, SEO/SEA, analytics, CRM) traite les briefs clients, un Brand Guardian contrôle la qualité, et **toute action externe (publication, email, campagne pub) attend une validation humaine** dans le dashboard.
+# Ai-Agency: a self-hosted multi-agent system
 
-Tous les modèles passent par **OmniRoute**, la passerelle locale sur `http://localhost:20129/v1`. Aucun code n'est lié à un fournisseur : on change de modèle dans OmniRoute, pas dans le code.
+[![CI](https://github.com/NefziSofien/Ai-Agency/actions/workflows/ci.yml/badge.svg)](https://github.com/NefziSofien/Ai-Agency/actions/workflows/ci.yml)
+
+A self-hosted multi-agent system for a digital marketing agency. A team of specialised agents (strategy, content, visuals, social, SEO/SEA, analytics, CRM) handles client briefs, a Brand Guardian checks quality, and **every external action (publishing, email, ad campaign) waits for human approval** in the dashboard.
+
+All models go through **OmniRoute**, a local gateway on `http://localhost:20129/v1`. No code is tied to a provider: you change models in OmniRoute, not in the code.
+
+> Agent prompts and the dashboard are in French. See [LESSONS.md](LESSONS.md) for what broke and what I would change.
 
 ```mermaid
 flowchart TB
-    Dashboard["Dashboard Next.js :3000"] --> API["API FastAPI :8000"]
+    Dashboard["Next.js dashboard :3000"] --> API["FastAPI :8000"]
     N8N["n8n :5678"] --> API
-    API --> Graph["Graphe LangGraph"]
-    Graph --> Plan[Directeur de compte]
-    Plan --> Depts["Départements spécialisés"]
+    API --> Graph["LangGraph graph"]
+    Graph --> Plan[Account director]
+    Plan --> Depts["Specialised departments"]
     Depts --> Guardian[Brand Guardian]
-    Guardian --> Approval[Validation humaine]
-    Approval --> Exec["Exécution : Postiz, Twenty, Listmonk, Google Ads, Meta"]
+    Guardian --> Approval[Human approval]
+    Approval --> Exec["Execution: Postiz, Twenty, Listmonk, Google Ads, Meta"]
     Graph --> OmniRoute["OmniRoute :20129"]
     Graph --> PG[("Postgres + pgvector")]
-    Graph --> S3[("Stockage S3 RustFS")]
+    Graph --> S3[("RustFS S3 storage")]
     Graph --> Langfuse["Langfuse :3001"]
 ```
 
-## Démarrage rapide
+## Quick start
 
 ```bash
-git clone <url-du-depot> agence-ia && cd agence-ia
-scripts/init_env.sh          # génère .env avec des secrets aléatoires (une seule fois)
+git clone https://github.com/NefziSofien/Ai-Agency.git agence-ia && cd agence-ia
+scripts/init_env.sh          # generates .env with random secrets (once)
 scripts/start.sh             # Docker (core) + OmniRoute + API + dashboard
-scripts/start.sh observability automation social crm   # avec tous les services
+scripts/start.sh observability automation social crm   # with all services
 scripts/start.sh --stop
 ```
 
-Puis, une seule fois :
+Then, once:
 
-1. **Connecter un fournisseur dans OmniRoute** : ouvre http://localhost:20129, ajoute au moins un fournisseur (clé API ou connexion OAuth). Sans fournisseur, aucun agent ne peut répondre.
-2. **Créer une clé OmniRoute pour l'agence** (dashboard OmniRoute -> API Keys) et la mettre dans `.env` : `OMNIROUTE_API_KEY=sk-...`, puis relancer `scripts/start.sh`.
-3. Ouvrir http://localhost:3000, page **Usage et santé** : OmniRoute doit être « ok » avec au moins un modèle.
-4. Page **Clients** : créer un client avec son brand kit, puis lancer un brief depuis la page **Briefs**.
+1. **Connect a provider in OmniRoute:** open http://localhost:20129 and add at least one provider. Without one, no agent can respond.
+2. **Create an OmniRoute key for the agency** (OmniRoute dashboard, API Keys), set `OMNIROUTE_API_KEY=sk-...` in `.env`, then rerun `scripts/start.sh`.
+3. **Check health:** open http://localhost:3000, page **Usage et santé**. OmniRoute should be "ok" with at least one model.
+4. **Run a brief:** create a client with a brand kit on the **Clients** page, then start a brief from the **Briefs** page.
 
-## Modèles par rôle (OmniRoute)
+## How a run works
 
-Les agents utilisent trois rôles, configurés dans `.env` :
+1. **Plan:** the account director splits the brief into tasks, or uses the selected departments.
+2. **Departments:** they run in order (strategy, SEO, analytics, content, visuals, social, CRM). Each one sees earlier deliverables, the client's brand kit and its own tools.
+3. **Brand Guardian:** checks tone, compliance and accuracy, and sends departments back for revision (one automatic revision by default, `MAX_REVISIONS`).
+4. **Deliverable:** a summary and reports, exported as PDF to S3 storage.
+5. **Human approval:** approve (choosing which actions to execute), request a revision with feedback, or reject. Automated monitoring runs with no actions finish without approval.
+6. **Execution** of the approved actions. A failed action does not stop the others.
 
-| Variable | Utilisé par | Valeur par défaut |
+Run state is persisted in Postgres (LangGraph checkpointer), so approval can happen days later.
+
+## Agents, tools and actions
+
+| Department | Tools | Actions requiring approval |
 |---|---|---|
-| `MODEL_STRATEGIE` | Directeur de compte, Stratégie, SEO/SEA, Analytics, juge des évaluations | `auto` |
-| `MODEL_REDACTION` | Contenu, Visuels, Social, CRM | `auto` |
-| `MODEL_RAPIDE` | Brand Guardian, synthèses | `auto/fast` |
-| `MODEL_FALLBACK` | Modèles de secours, essayés dans l'ordre quand un appel échoue (quota épuisé, fournisseur indisponible) | vide |
-| `MODEL_EMBEDDING` | Mémoire de marque (pgvector), optionnel | vide |
-| `MODEL_IMAGE` / `MODEL_TTS` | Agent Visuels | vide |
+| Strategy and monitoring | web search (local SearXNG or Tavily), page reading | - |
+| SEO and SEA | on-page audit, Search Console, Google Ads, Meta Ads | `google_ads_create_campaign`, `meta_create_campaign` (always paused) |
+| Analytics | GA4, Search Console, Google Ads, Meta Ads, Postiz channels | - |
+| Content | web search | - |
+| Visuals | image and voice-over generation through OmniRoute | - |
+| Social media | Postiz channels | `postiz_schedule` |
+| CRM | Twenty CRM, Listmonk lists, web search | `crm_create_company`, `crm_create_person`, `email_campaign` |
 
-`auto` fonctionne dès qu'un fournisseur est connecté. Chaque variable accepte aussi une liste séparée par des virgules : les modèles sont alors utilisés à tour de rôle. Pour fixer des modèles précis avec bascule automatique, crée des combos :
+An unconfigured tool does not block the agent: it reports the gap in its deliverable. Integrations are configured in `.env` and in each client's JSON settings. See [docs/integrations.md](docs/integrations.md) (French).
 
-```bash
-export OMNIROUTE_ADMIN_TOKEN=oma_live_...      # OmniRoute -> Settings -> Access Tokens
-uv run --project agents python scripts/omniroute_setup.py models   # liste les modèles disponibles
-export COMBO_STRATEGIE_MODELS="provider/modele-raisonnement,provider/modele-secours"
-export COMBO_REDACTION_MODELS="provider/modele-redaction"
-export COMBO_RAPIDE_MODELS="provider/modele-rapide"
-uv run --project agents python scripts/omniroute_setup.py combos
-```
+## Model roles
 
-Puis dans `.env` : `MODEL_STRATEGIE=agence-strategie`, `MODEL_REDACTION=agence-redaction`, `MODEL_RAPIDE=agence-rapide`.
-
-### Fournisseurs sans appels d'outils
-
-Certains fournisseurs OmniRoute (passerelles web gratuites comme `cfp/` ou `ddgw/`) ignorent les paramètres `tools` et `response_format`. Avec `TOOL_MODE=prompt`, les outils et le schéma JSON attendu sont décrits dans le prompt, la réponse est parsée puis validée, avec relance en cas de format invalide. Garde `TOOL_MODE=native` pour les fournisseurs API classiques (OpenAI, Anthropic, Gemini, Groq…), plus rapides et plus fiables.
-
-Configuration testée sans fournisseur payant :
-
-```
-TOOL_MODE=prompt
-MODEL_STRATEGIE=cfp/zai-org/glm-5.2,cfp/deepseek-ai/deepseek-v4-pro-0813,cfp/openai/gpt-oss-120b,cfp/nvidia/nemotron-3-120b-a12b,cfp/moonshotai/kimi-k2.7-code
-MODEL_REDACTION=cfp/moonshotai/kimi-k2.6,cfp/meta-llama/llama-3.3-70b-instruct-fp8-fast,cfp/mistralai/mistral-small-3.1-24b-instruct,cfp/google/gemma-4-26b-a4b-it
-MODEL_RAPIDE=cfp/deepseek-ai/deepseek-v4-flash-0731,cfp/zai-org/glm-4.7-flash,cfp/openai/gpt-oss-20b,cfp/qwen/qwen3-30b-a3b-fp8,cfp/meta/llama-4-scout-17b-16e-instruct
-```
-
-Compte environ une minute par appel de modèle : un run stratégie + contenu prend une dizaine de minutes.
-
-### Clé et quotas par client
-
-```bash
-uv run --project agents python scripts/omniroute_setup.py key "Client ACME" --daily 5 --weekly 25
-uv run --project agents python scripts/omniroute_setup.py quota <key_id> --daily 10
-```
-
-Colle la clé dans la fiche client du dashboard. Les tokens consommés sont suivis par client, rôle et modèle dans la page **Usage et santé** ; les coûts en dollars et les quotas sont dans OmniRoute.
-
-## Fonctionnement d'un run
-
-1. **Plan** : le Directeur de compte découpe le brief en tâches (ou utilise les départements cochés).
-2. **Départements** : exécutés dans l'ordre stratégie, SEO, analytics, contenu, visuels, social, CRM ; chacun voit les livrables des précédents, le brand kit du client et ses outils.
-3. **Brand Guardian** : contrôle ton, conformité et exactitude ; renvoie les départements concernés en révision (1 révision automatique par défaut, `MAX_REVISIONS`).
-4. **Livrable** : synthèse + rapports, exporté en PDF dans le stockage S3.
-5. **Validation humaine** : valider (en choisissant les actions à exécuter), demander une révision avec un retour, ou rejeter. Les veilles automatiques sans action se terminent sans validation.
-6. **Exécution** des actions validées. Une action en échec n'empêche pas les autres.
-
-L'état des runs est persisté dans Postgres (checkpointer LangGraph) : une validation peut avoir lieu des jours plus tard.
-
-## Agents, outils et actions
-
-| Département | Outils | Actions soumises à validation |
+| Variable | Used by | Default |
 |---|---|---|
-| Stratégie et veille | recherche web (SearXNG local ou Tavily), lecture de pages | - |
-| SEO et SEA | audit on-page, Search Console, Google Ads, Meta Ads | `google_ads_create_campaign`, `meta_create_campaign` (toujours en PAUSE) |
-| Analytics | GA4, Search Console, Google Ads, Meta Ads, canaux Postiz | - |
-| Contenu | recherche web | - |
-| Visuels | génération d'images et de voix off via OmniRoute | - |
-| Social media | canaux Postiz | `postiz_schedule` |
-| CRM | Twenty CRM, listes Listmonk, recherche web | `crm_create_company`, `crm_create_person`, `email_campaign` |
+| `MODEL_STRATEGIE` | Account director, strategy, SEO/SEA, analytics, evaluation judge | `auto` |
+| `MODEL_REDACTION` | Content, visuals, social, CRM | `auto` |
+| `MODEL_RAPIDE` | Brand Guardian, summaries | `auto/fast` |
+| `MODEL_FALLBACK` | Backup models, tried in order when a call fails | empty |
+| `MODEL_EMBEDDING` | Brand memory (pgvector), optional | empty |
+| `MODEL_IMAGE` / `MODEL_TTS` | Visuals agent | empty |
 
-Un outil non configuré ne bloque pas l'agent : il le signale dans son livrable. Les intégrations se configurent dans `.env` (clés globales) et dans les **paramètres JSON** de chaque client (`ga4_property_id`, `search_console_site`, `google_ads_customer_id`, `meta_ad_account_id`, `postiz_integration_ids`, `listmonk_list_ids`). Voir [docs/integrations.md](docs/integrations.md).
+Some providers ignore `tools` and `response_format`. With `TOOL_MODE=prompt`, tools and the expected JSON schema are described in the prompt, and the reply is parsed, validated and retried if invalid. Keep `TOOL_MODE=native` for standard API providers, which are faster and more reliable.
 
-## Services
-
-| Service | URL | Profil Docker |
-|---|---|---|
-| Dashboard de l'agence | http://localhost:3000 | (Node, hôte) |
-| API des agents | http://localhost:8000/docs | (Python, hôte) |
-| OmniRoute | http://localhost:20129 | (Node, hôte) |
-| Postgres + pgvector | localhost:5433 | core |
-| Redis | localhost:6380 | core |
-| Stockage S3 (RustFS) | http://localhost:9001 (console) | core |
-| SearXNG | http://localhost:8888 | core |
-| Langfuse | http://localhost:3001 | observability |
-| n8n | http://localhost:5678 | automation |
-| Postiz (+ Temporal) | http://localhost:4007 | social |
-| Twenty CRM | http://localhost:3002 | crm |
-| Listmonk | http://localhost:9002 | crm |
-
-Tous les ports sont liés à `127.0.0.1`, sauf l'API (`0.0.0.0:8000`, protégée par `AGENCE_API_KEY`) pour que n8n puisse l'appeler depuis Docker. Identifiants admin (Langfuse, Listmonk) : `ADMIN_EMAIL` / `ADMIN_PASSWORD` dans `.env`.
-
-> MinIO ne publie plus d'images Docker : le stockage S3 utilise RustFS, compatible S3.
-
-### Pare-feu : accès des conteneurs à l'hôte
-
-n8n et Postiz appellent l'API (`:8000`) et OmniRoute (`:20129`) via `host.docker.internal`. Si le pare-feu de l'hôte (ufw) bloque ce trafic, autorise les réseaux Docker :
+## Quality, backups, tests
 
 ```bash
-sudo ufw allow from 172.16.0.0/12 to any port 8000,20129 proto tcp
-```
-
-## Automatisations n8n
-
-```bash
-scripts/start.sh automation
-scripts/n8n_import.sh
-```
-
-Les workflows sont importés désactivés ; active-les dans http://localhost:5678 après vérification.
-
-| Workflow | Déclenchement | Effet |
-|---|---|---|
-| Erreurs des automatisations | erreur d'un workflow | alerte dans le dashboard (page Usage et santé) |
-| Veille quotidienne | lun-sam 7h30 | run Stratégie pour les clients avec `daily_watch: true` |
-| Rapports hebdomadaires | lundi 8h | run Analytics + PDF pour les clients avec `weekly_report: true` |
-| Relances CRM | mardi et jeudi 9h | run CRM pour les clients avec `crm_followups: true` |
-| Rappel des validations | jours ouvrés 10h et 16h | notification des livrables en attente |
-| Article de blog vers social | nouvel article RSS | run contenu + visuels + social, publication Postiz après validation |
-| Générateur de texte rapide | webhook `POST /webhook/generer-texte` | appel direct à OmniRoute |
-
-Pour utiliser les nœuds IA natifs de n8n, crée une credential **OpenAI** avec l'URL de base `http://host.docker.internal:20129/v1` et ta clé OmniRoute.
-
-## Qualité, sauvegardes, tests
-
-```bash
-# Évaluation des agents sur des briefs de référence (agents/evals/briefs.json), scores dans Langfuse
+# Evaluate agents on reference briefs (agents/evals/briefs.json), scores go to Langfuse
 cd agents && uv run agence-eval --min-score 7
 
-# Sauvegarde : Postgres, assets S3, base OmniRoute, .env (garde les 14 dernières)
+# Back up Postgres, S3 assets, the OmniRoute database and .env (keeps the last 14)
 scripts/backup.sh
 scripts/restore.sh backups/<date>
 
-# Tests (sans fournisseur réel, avec un faux OmniRoute)
-cd agents && uv run pytest -q tests/test_tools.py
-uv run uvicorn tests.mock_omniroute:app --port 20199 &
-OMNIROUTE_BASE_URL=http://localhost:20199/v1 OMNIROUTE_API_KEY=test uv run uvicorn agence.api.main:app --port 8010 &
-AGENCE_TEST_URL=http://localhost:8010 uv run python tests/e2e.py
+# Tests, with no real provider
+cd agents && uv run pytest -q tests/test_tools.py tests/test_llm.py tests/test_security.py
 ```
 
-Sauvegarde automatique chaque nuit : `crontab -e` puis
-`0 2 * * * /chemin/vers/agence-ia/scripts/backup.sh >> /chemin/vers/agence-ia/logs/backup.log 2>&1`
+Backups include a copy of `.env`, so keep `backups/` local or encrypt it before any transfer.
 
-Les sauvegardes contiennent une copie de `.env` (secrets) : garde le dossier `backups/` en local ou chiffre-le avant tout transfert.
+## Security
 
-Langfuse (profil `observability`) est initialisé avec le projet `agence-ia` et les clés de `.env` : les traces apparaissent automatiquement dès qu'il tourne au démarrage de l'API.
+This project is designed for a **trusted machine or server, not exposed to the internet**.
 
-## Sécurité
+- The dashboard has **no authentication**: anyone who reaches it controls the API. Put it behind an authenticated reverse proxy (VPN, SSO, basic auth).
+- If `AGENCE_API_KEY` is empty, the API is not authenticated. `scripts/init_env.sh` generates it. The API listens on `0.0.0.0:8000` for n8n in Docker: filter the port at the firewall, or set `API_HOST=127.0.0.1` if you do not use n8n.
+- `.env` holds all secrets and is ignored by git. Never commit it.
+- The `fetch_page` tool refuses non-public addresses (SSRF protection), and external actions always require human approval.
+- n8n can read environment variables (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`): only import trusted workflows.
+- Postiz accepts sign-ups (`DISABLE_REGISTRATION=false`): set it to `true` once your account exists.
+- Docker images use `latest`: pin versions for a durable deployment.
 
-Ce projet est conçu pour un **poste ou serveur de confiance, non exposé à Internet**. Points à connaître avant de le déployer :
+Reporting vulnerabilities: [SECURITY.md](SECURITY.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). License: [MIT](LICENSE).
 
-- Le dashboard n'a **pas d'authentification** : toute personne qui l'atteint pilote l'API (le proxy `/api` injecte `AGENCE_API_KEY`). Ne l'expose pas ; place-le derrière un reverse proxy avec authentification (VPN, SSO, basic auth).
-- Si `AGENCE_API_KEY` est vide, l'API n'est pas authentifiée. `scripts/init_env.sh` la génère ; l'API écoute sur `0.0.0.0:8000` pour n8n (Docker) : filtre le port au pare-feu ou définis `API_HOST=127.0.0.1` si tu n'utilises pas n8n.
-- Le fichier `.env` contient tous les secrets : il est ignoré par git (`chmod 600`). Ne le committe jamais.
-- L'outil `fetch_page` refuse les adresses non publiques (anti-SSRF) ; les actions externes restent soumises à validation humaine.
-- n8n a accès aux variables d'environnement (`N8N_BLOCK_ENV_ACCESS_IN_NODE=false`) : n'importe que des workflows de confiance.
-- Postiz accepte les inscriptions (`DISABLE_REGISTRATION=false`) : passe-le à `true` une fois ton compte créé.
-- Les images Docker utilisent `latest` : fige les versions pour un déploiement durable.
-
-Signalement de vulnérabilités : voir [SECURITY.md](SECURITY.md). Contribuer : [CONTRIBUTING.md](CONTRIBUTING.md). Licence : [MIT](LICENSE).
-
-## Structure
-
-```
-agents/                    API et agents (Python, uv)
-  src/agence/
-    api/main.py            API FastAPI (clients, runs, validations, usage, automatisations)
-    graphs/agency.py       graphe LangGraph (plan, départements, Brand Guardian, validation, exécution)
-    graphs/departments.py  registre des départements : rôle, outils, actions
-    prompts/               consignes de chaque agent (Markdown, en français)
-    tools/                 web, SEO, analytics, ads, visuels, Postiz, CRM
-    llm.py                 accès aux modèles via OmniRoute + suivi d'usage
-    memory.py              brand kits et recherche pgvector
-    runner.py              exécution en arrière-plan et reprise après validation
-    evals.py               évaluation qualité
-  evals/briefs.json        cas d'évaluation
-  tests/                   faux OmniRoute, tests outils, test de bout en bout
-dashboard/                 Next.js
-n8n/workflows/             workflows n8n versionnés
-infra/                     init Postgres, SearXNG, Temporal
-scripts/                   init, démarrage, OmniRoute, n8n, sauvegardes
-```
+The full French documentation, including n8n workflows, per-client quotas and all service ports, is in [README.fr.md](README.fr.md).
